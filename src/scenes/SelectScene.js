@@ -28,6 +28,7 @@ export class SelectScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor(COLORS.navy);
     focusGameCanvas(this);
+    this.input.mouse?.disableContextMenu();
 
     this.add
       .text(GAME_WIDTH / 2, 150, 'CHOOSE YOUR', {
