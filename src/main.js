@@ -1,10 +1,9 @@
 import * as Phaser from 'phaser';
+import { GAME_HEIGHT, GAME_WIDTH } from './config/constants.js';
 import { BootScene } from './scenes/BootScene.js';
-
-// Game resolution stays 1920x1080. FIT + CENTER_BOTH letterboxes this
-// onto any window so the fight camera math never changes.
-export const GAME_WIDTH = 1920;
-export const GAME_HEIGHT = 1080;
+import { GameScene } from './scenes/GameScene.js';
+import { SelectScene } from './scenes/SelectScene.js';
+import { TitleScene } from './scenes/TitleScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -17,7 +16,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene],
+  scene: [BootScene, TitleScene, SelectScene, GameScene],
 };
 
 function showBootError(error) {
