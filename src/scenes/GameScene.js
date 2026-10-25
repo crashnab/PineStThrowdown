@@ -1,8 +1,7 @@
 import * as Phaser from 'phaser';
 import { createMatchConfig } from '../config/characters.js';
-import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, MODES, SCENES } from '../config/constants.js';
-import { SHARED_KEYS } from '../config/controls.js';
-import { createJustDownMap } from '../systems/InputMap.js';
+import { FONTS, GAME_HEIGHT, GAME_WIDTH, MODES, SCENES } from '../config/constants.js';
+import { bindActions, focusGameCanvas } from '../systems/InputMap.js';
 
 /**
  * Placeholder fight room. It only proves that Character Select can
@@ -23,6 +22,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(0x12081f);
+    focusGameCanvas(this);
 
     const { mode, p1, p2 } = this.match;
     const modeLabel = mode === MODES.ARCADE ? 'ARCADE' : '2 PLAYER VS';
@@ -73,31 +73,32 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.add
-      .text(
-        GAME_WIDTH / 2,
-        GAME_HEIGHT - 70,
-        mode === MODES.VERSUS
-          ? 'MATCH STUB  ·  ESC  RETURNS  TO  CHARACTER  SELECT'
-          : 'MATCH STUB  ·  ESC  RETURNS  TO  TITLE',
-        {
-          fontFamily: FONTS.body,
-          fontSize: '22px',
-          color: '#8ea0c8',
-        }
-      )
-      .setOrigin(0.5);
+    const backHint =
+      mode === MODES.VERSUS
+        ? 'MATCH STUB  ·  ESC  OR  CLICK  RETURNS  TO  CHARACTER  SELECT'
+        : 'MATCH STUB  ·  ESC  OR  CLICK  RETURNS  TO  TITLE';
 
-    this.keys = createJustDownMap(this, SHARED_KEYS);
-    this.input.keyboard.addCapture('ESC');
+    const backText = this.add
+      .text(GAME_WIDTH / 2, GAME_HEIGHT - 70, backHint, {
+        fontFamily: FONTS.body,
+        fontSize: '22px',
+        color: '#8ea0c8',
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    backText.on('pointerdown', () => this.goBack());
+    this.input.on('pointerdown', () => this.goBack());
+
+    bindActions(this, {
+      back: () => this.goBack(),
+      confirm: () => this.goBack(),
+    });
+
     console.info('[GameScene] Stub match', p1.id, 'vs', p2.id, 'in', mode);
   }
 
-  update() {
-    if (!this.keys.back()) {
-      return;
-    }
-
+  goBack() {
     if (this.match.mode === MODES.VERSUS) {
       this.scene.start(SCENES.SELECT, { mode: MODES.VERSUS });
       return;

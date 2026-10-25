@@ -7,8 +7,7 @@ import {
   getCpuOpponent,
 } from '../config/characters.js';
 import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, MODES, SCENES } from '../config/constants.js';
-import { P1_SELECT_KEYS, P2_SELECT_KEYS, SHARED_KEYS } from '../config/controls.js';
-import { anyJustDown, createJustDownMap } from '../systems/InputMap.js';
+import { bindActions, bindPlayerActions, focusGameCanvas } from '../systems/InputMap.js';
 import { SelectGrid, moveOnGrid } from '../ui/SelectGrid.js';
 
 export class SelectScene extends Phaser.Scene {
@@ -28,6 +27,7 @@ export class SelectScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(COLORS.navy);
+    focusGameCanvas(this);
 
     this.add
       .text(GAME_WIDTH / 2, 150, 'CHOOSE YOUR', {
@@ -51,6 +51,7 @@ export class SelectScene extends Phaser.Scene {
 
     this.grid = new SelectGrid(this, CHARACTERS);
     this.grid.create();
+    this.bindPortraitClicks();
 
     this.p1Preview = this.add.image(340, 880, 'easy-e-preview').setOrigin(0.5, 1);
     this.p2Preview = this.add.image(1588, 880, 'robgob-preview').setOrigin(0.5, 1);
@@ -112,8 +113,8 @@ export class SelectScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     const hint = this.isArcade
-      ? 'P1  WASD  MOVE   ·   F  OR  SPACE  CONFIRM   ·   ESC  BACK'
-      : 'P1  WASD + F     P2  ARROWS + ENTER     ESC  BACK';
+      ? 'P1  WASD  MOVE   ·   F  OR  SPACE  CONFIRM   ·   CLICK  A  PORTRAIT   ·   ESC  BACK'
+      : 'P1  WASD + F     P2  ARROWS + ENTER     LEFT CLICK P1  ·  RIGHT CLICK P2     ESC  BACK';
 
     this.add
       .text(GAME_WIDTH / 2, GAME_HEIGHT - 36, hint, {
@@ -123,57 +124,66 @@ export class SelectScene extends Phaser.Scene {
       })
       .setOrigin(0.5);
 
-    this.p1Keys = createJustDownMap(this, P1_SELECT_KEYS);
-    this.p2Keys = createJustDownMap(this, P2_SELECT_KEYS);
-    this.sharedKeys = createJustDownMap(this, SHARED_KEYS);
-    this.input.keyboard.addCapture(
-      'W,A,S,D,F,SPACE,UP,DOWN,LEFT,RIGHT,ENTER,ESC'
-    );
+    bindPlayerActions(this, 'p1', {
+      left: () => this.tryMove('p1', -1, 0),
+      right: () => this.tryMove('p1', 1, 0),
+      up: () => this.tryMove('p1', 0, -1),
+      down: () => this.tryMove('p1', 0, 1),
+      confirm: () => this.toggleLock('p1'),
+    });
+
+    if (!this.isArcade) {
+      bindPlayerActions(this, 'p2', {
+        left: () => this.tryMove('p2', -1, 0),
+        right: () => this.tryMove('p2', 1, 0),
+        up: () => this.tryMove('p2', 0, -1),
+        down: () => this.tryMove('p2', 0, 1),
+        confirm: () => this.toggleLock('p2'),
+      });
+    }
+
+    bindActions(this, {
+      back: () => this.handleBack(),
+    });
 
     this.refresh();
     console.info('[SelectScene] Mode:', this.mode);
   }
 
-  update() {
+  bindPortraitClicks() {
+    this.grid.portraits.forEach((portrait, index) => {
+      portrait.setInteractive({ useHandCursor: true });
+      portrait.on('pointerdown', (pointer) => {
+        if (this.startingMatch) {
+          return;
+        }
+
+        const playerId = pointer.rightButtonDown() || pointer.event.ctrlKey ? 'p2' : 'p1';
+        if (this.isArcade && playerId === 'p2') {
+          return;
+        }
+
+        const player = this.players[playerId];
+        if (player.index === index) {
+          this.toggleLock(playerId);
+          return;
+        }
+
+        if (player.locked) {
+          return;
+        }
+
+        player.index = index;
+        this.refresh();
+      });
+    });
+  }
+
+  tryMove(playerId, dx, dy) {
     if (this.startingMatch) {
       return;
     }
 
-    this.handlePlayerInput('p1', this.p1Keys);
-
-    if (!this.isArcade) {
-      this.handlePlayerInput('p2', this.p2Keys);
-    }
-
-    if (this.sharedKeys.back()) {
-      this.handleBack();
-    }
-  }
-
-  handlePlayerInput(playerId, keys) {
-    const player = this.players[playerId];
-
-    if (anyJustDown(keys, ['left'])) {
-      this.tryMove(playerId, -1, 0);
-    } else if (anyJustDown(keys, ['right'])) {
-      this.tryMove(playerId, 1, 0);
-    } else if (anyJustDown(keys, ['up'])) {
-      this.tryMove(playerId, 0, -1);
-    } else if (anyJustDown(keys, ['down'])) {
-      this.tryMove(playerId, 0, 1);
-    }
-
-    if (anyJustDown(keys, ['confirm', 'confirmAlt'])) {
-      if (player.locked) {
-        player.locked = false;
-        this.refresh();
-        return;
-      }
-      this.tryLock(playerId);
-    }
-  }
-
-  tryMove(playerId, dx, dy) {
     const player = this.players[playerId];
     if (player.locked) {
       return;
@@ -181,6 +191,24 @@ export class SelectScene extends Phaser.Scene {
 
     player.index = moveOnGrid(player.index, dx, dy);
     this.refresh();
+  }
+
+  toggleLock(playerId) {
+    if (this.startingMatch) {
+      return;
+    }
+
+    const player = this.players[playerId];
+    if (player.locked) {
+      player.locked = false;
+      if (this.isArcade) {
+        this.players.p2.locked = false;
+      }
+      this.refresh();
+      return;
+    }
+
+    this.tryLock(playerId);
   }
 
   tryLock(playerId) {
@@ -207,6 +235,10 @@ export class SelectScene extends Phaser.Scene {
   }
 
   handleBack() {
+    if (this.startingMatch) {
+      return;
+    }
+
     const someoneLocked = this.players.p1.locked || this.players.p2.locked;
 
     if (someoneLocked) {

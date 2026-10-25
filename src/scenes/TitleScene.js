@@ -1,7 +1,6 @@
 import * as Phaser from 'phaser';
 import { COLORS, FONTS, GAME_HEIGHT, GAME_WIDTH, MODES, SCENES } from '../config/constants.js';
-import { TITLE_KEYS } from '../config/controls.js';
-import { anyJustDown, createJustDownMap } from '../systems/InputMap.js';
+import { bindActions, focusGameCanvas } from '../systems/InputMap.js';
 
 const MENU = [
   { label: '1 PLAYER', hint: 'ARCADE', mode: MODES.ARCADE },
@@ -18,6 +17,7 @@ export class TitleScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor(COLORS.navy);
     this.selected = 1;
+    focusGameCanvas(this);
 
     this.add
       .text(GAME_WIDTH / 2, 250, 'PINE ST', {
@@ -41,14 +41,23 @@ export class TitleScene extends Phaser.Scene {
 
     this.menuTexts = MENU.map((item, index) => {
       const text = this.add
-        .text(GAME_WIDTH / 2, 620 + index * 90, '', {
+        .text(GAME_WIDTH / 2, 620 + index * 90, `${item.label}   ${item.hint}`, {
           fontFamily: FONTS.display,
           fontSize: '56px',
           stroke: '#000000',
           strokeThickness: 6,
         })
-        .setOrigin(0.5);
-      text.setData('index', index);
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      text.on('pointerover', () => {
+        this.selected = index;
+        this.refreshMenu();
+      });
+      text.on('pointerdown', () => {
+        this.selected = index;
+        this.confirm();
+      });
       return text;
     });
 
@@ -56,7 +65,7 @@ export class TitleScene extends Phaser.Scene {
       .text(
         GAME_WIDTH / 2,
         GAME_HEIGHT - 70,
-        'W / S  OR  ARROWS   ·   ENTER  OR  SPACE  TO  SELECT',
+        'W / S  OR  ARROWS   ·   ENTER  OR  SPACE   ·   OR  CLICK',
         {
           fontFamily: FONTS.body,
           fontSize: '22px',
@@ -65,36 +74,30 @@ export class TitleScene extends Phaser.Scene {
       )
       .setOrigin(0.5);
 
-    this.keys = createJustDownMap(this, TITLE_KEYS);
-    this.input.keyboard.addCapture('W,S,UP,DOWN,ENTER,SPACE');
-    this.refreshMenu();
+    bindActions(this, {
+      up: () => this.move(-1),
+      down: () => this.move(1),
+      confirm: () => this.confirm(),
+    });
 
+    this.refreshMenu();
     console.info('[TitleScene] Ready. Choose Arcade or VS.');
   }
 
-  update() {
-    if (anyJustDown(this.keys, ['up', 'upAlt'])) {
-      this.selected = (this.selected + MENU.length - 1) % MENU.length;
-      this.refreshMenu();
-    }
+  move(direction) {
+    this.selected = (this.selected + direction + MENU.length) % MENU.length;
+    this.refreshMenu();
+  }
 
-    if (anyJustDown(this.keys, ['down', 'downAlt'])) {
-      this.selected = (this.selected + 1) % MENU.length;
-      this.refreshMenu();
-    }
-
-    if (anyJustDown(this.keys, ['confirm', 'confirmAlt'])) {
-      const choice = MENU[this.selected];
-      console.info('[TitleScene] Starting select in', choice.mode, 'mode');
-      this.scene.start(SCENES.SELECT, { mode: choice.mode });
-    }
+  confirm() {
+    const choice = MENU[this.selected];
+    console.info('[TitleScene] Starting select in', choice.mode, 'mode');
+    this.scene.start(SCENES.SELECT, { mode: choice.mode });
   }
 
   refreshMenu() {
     this.menuTexts.forEach((text, index) => {
-      const item = MENU[index];
       const active = index === this.selected;
-      text.setText(`${item.label}   ${item.hint}`);
       text.setColor(active ? '#ffd54a' : '#c5d0ea');
       text.setScale(active ? 1.08 : 1);
     });
