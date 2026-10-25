@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
     <title>Pine St Throwdown</title>
     <style>
       html,
@@ -28,9 +29,10 @@
       }
     </style>
     <!--
-      Import maps let the browser resolve `import Phaser from 'phaser'`
+      Import maps let the browser resolve `import * as Phaser from 'phaser'`
       without Webpack. Pin the Phaser 3 ESM build so a CDN update cannot
-      silently bump us to Phaser 4.
+      silently bump us to Phaser 4. Phaser 3.90 ships named exports only,
+      so scenes import the namespace rather than a default export.
     -->
     <script type="importmap">
       {
